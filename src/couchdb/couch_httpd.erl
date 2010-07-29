@@ -277,11 +277,16 @@ handle_request_int(MochiReq, DefaultFun,
 
     {ok, Resp} =
     try
-        case authenticate_request(HttpReq, AuthenticationSrcs) of
-        #httpd{} = Req ->
-            HandlerFun(Req);
-        Response ->
-            Response
+        case Method =:= 'OPTIONS' of
+        true ->
+            send_json(HttpReq, 200, [{"Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, COPY, OPTIONS"},{"Access-Control-Max-Age", "86400"}], {[]});
+        false ->
+            case authenticate_request(HttpReq, AuthenticationSrcs) of
+            #httpd{} = Req ->
+                HandlerFun(Req);
+            Response ->
+                Response
+            end
         end
     catch
         throw:{http_head_abort, Resp0} ->
@@ -631,9 +636,13 @@ send_json(Req, Code, Value) ->
     send_json(Req, Code, [], Value).
 
 send_json(Req, Code, Headers, Value) ->
+    Origin = header_value(Req, "Origin", "*"),  
     DefaultHeaders = [
         {"Content-Type", negotiate_content_type(Req)},
-        {"Cache-Control", "must-revalidate"}
+        {"Cache-Control", "must-revalidate"},
+        {"Access-Control-Allow-Origin", Origin},
+        {"Access-Control-Allow-Headers", "Content-Type, Authorization"},
+        {"Access-Control-Allow-Credentials", "true"}
     ],
     Body = list_to_binary(
         [start_jsonp(Req), ?JSON_ENCODE(Value), end_jsonp(), $\n]
@@ -644,9 +653,13 @@ start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers) ->
+    Origin = header_value(Req, "Origin", "*"),  
     DefaultHeaders = [
         {"Content-Type", negotiate_content_type(Req)},
-        {"Cache-Control", "must-revalidate"}
+        {"Cache-Control", "must-revalidate"},
+        {"Access-Control-Allow-Origin", Origin},
+        {"Access-Control-Allow-Headers", "Content-Type, Authorization"},
+        {"Access-Control-Allow-Credentials", "true"}
     ],
     start_jsonp(Req), % Validate before starting chunked.
     %start_chunked_response(Req, Code, DefaultHeaders ++ Headers).
